@@ -38,7 +38,7 @@ export function createGlobalState<T>(initial: InitialAction<T>) {
         return state;
     }
 
-    return [useStore, store]
+    return [useStore, store] as const;
 }
 
 /*
