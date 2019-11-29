@@ -1,6 +1,6 @@
 {
   "name": "@mha15/globalstate-hook",
-  "version": "0.4.0",
+  "version": "0.5.1",
   "description": "this is a react-hook which helps you to make stores(and any globalState) without needing context and Provider component",
   "main": "index.js",
   "types": "index.d.ts",
