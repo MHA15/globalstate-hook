@@ -12,32 +12,36 @@ const defaultConfig = {
 } as const;
 
 function makeDeferred<T>() {
-    type D = { resolve: (v: T) => void, reject: (e: Error) => void };
-    const p: Promise<T> & Partial<D> = new Promise<T>((resolve, reject) => {
-        p.resolve = resolve;
-        p.reject = reject;
+    type Deferred<T> = { resolve: (v: T) => void, reject: (e: Error) => void, readonly promise: Promise<T> };
+    const deferred = {
+        get promise() {
+            return promise;
+        }
+    } as Deferred<T>;
+    const promise = new Promise<T>((resolve, reject) => {
+        deferred.resolve = resolve;
+        deferred.reject = reject;
     });
-    return p as Promise<T> & D;
+    return deferred;
 }
 
 function createSuspendHandler<T>() {
     let deferred: ReturnType<typeof makeDeferred> | null = null;
     let state: T | undefined;
     function getOrSuspend() {
-        if (state !== undefined && deferred) {
-            deferred.resolve(state);
-            deferred = null;
-        } else if(state === undefined && !deferred)
-            deferred = makeDeferred<T>();
-
         if (deferred) {
-            throw deferred;
+            throw deferred.promise;
         } else {
             return state as T;
         }
     }
     function updateSuspender(_state: T) {
-       state = _state;
+        state = _state;
+        if (state !== undefined && deferred) {
+            deferred.resolve(state);
+            deferred = null;
+        } else if (state === undefined && !deferred)
+            deferred = makeDeferred<T>();
     }
 
     return [getOrSuspend, updateSuspender] as const;
@@ -70,7 +74,7 @@ function isFuncState<T>(action: SetStateAction<T> | InitialAction<T>) {
     return typeof action === 'function'
 }
 
-export function createGlobalState<T, C extends Config>(initial: InitialAction<T>, config?: C) {
+export function createGlobalState<T, C extends Config = {}>(initial: InitialAction<T>, config?: C) {
     const {updateComponents, useListen} = createUpdater<T>();
     const [getOrSuspend, updateSuspender] = createSuspendHandler<T>();
 
@@ -94,7 +98,7 @@ export function createGlobalState<T, C extends Config>(initial: InitialAction<T>
 
     store.state = isFuncState(initial) ? initial() : initial;
 
-    function useStore<OC extends Config>(overrideConfig?: OC): MixedConditions3<typeof defaultConfig['suspendable'], C['suspendable'], OC['suspendable']> extends true ? NonNullable<T> : T {
+    function useStore<OC extends Config = {}>(overrideConfig?: OC): MixedConditions3<typeof defaultConfig['suspendable'], C['suspendable'], OC['suspendable']> extends true ? Exclude<T, undefined> : T {
         const state = useListen(store.state);
         const c = {...defaultConfig, ...config, ...overrideConfig};
         if (c.suspendable) {
